@@ -1,8 +1,19 @@
 #include "lib/include.h"
 
 //configuración UART4, Baud-rate 4800
-//U4Tx->PC5
+//U4Tx->PC5 (se conecta al Rx del modulo)
 //U4Rx->PC4
+
+//el modulo aparece como "USB serial mode"
+
+/*PASOS
+* 1. en una nueva terminal, escribit python
+* 2. import serial as s
+* 3. ser=s.Serial('COM11',4800)
+* 4. ser.write(b'n')->prende rosa
+* 5. ser.write(b'nombre.')
+* 6. ser.read(#) (el total de letras y numeros)
+*/
 extern void Configurar_UART0(void)
 {
     SYSCTL->RCGCUART  = (1<<4); //inicializar y habilitar el UART (RCGCUART) p. 902,344
@@ -29,61 +40,90 @@ extern void Configurar_UART0(void)
     UART4->CTL = (1<<9) | (1<<8) | (1<<0); //habilitar el UART p. 918
 }
 
-extern char readChar(void) //retorna un valor de tipo char
+extern char readChar(void) //función que lee un caracter 
 {
-    //UART flag register (UARTFR) p. 911
-    //UART data register (UARTDR) p. 906
     int v;
     char c;
-    while((UART0->FR & (1<<4)) != 0 ); //mientras se reciba un dato, se va a almacenar
-    //1 -> el receiver no está vacio
-    //0 -> el receiver FIFO esta vacio 
-    v = UART0->DR & 0xFF; //se escriben los datos que se van a transmitir
-    //0xFF = 1111 1111
-    c = v;
-    return c;
+    while((UART4->FR & (1<<4)) != 0 );
+    v = UART4->DR & 0xFF;
+    c = v; //lo guarda en 'c'
+    return c; //lo regresa 
 }
 
-extern void printChar(char c) //recibe a c
+extern void printChar(char c) //función para imprimir un caracter 
 {
-    while((UART4->FR & (1<<5)) != 0 ); 
-    //1 -> el transmit FIFO is full 
-    //0 -> el transmitter is not full
+    while((UART4->FR & (1<<5)) != 0 );
     UART4->DR = c;
 }
 
-extern void printString(char* string)
+extern void printString(char* string, int longitud) //función para imprimir una cadena (el nombre) 
 {
-    while(*string)
+    int i=0;
+    while(string[i]>47) //el 47 es por el ascii (evitar que le lleguen cosas raras)
     {
-        printChar(*(string++));
+        printChar(string[i]); //va imprimiendo cada caracter
+        i++;
     }
 }
 
-extern char * readString(char delimitador)
+extern int readString(char delimitador, char *string) //función para leer una cadena 
 {
-
-   int i=0;
-   char *string = (char *)calloc(10,sizeof(char));
+   int i = 0;
    char c = readChar();
-   while(c != delimitador)
+   while(c != delimitador) //cuando sea igual al delimitador (.) se detiene
    {
-       *(string+i) = c;
+       string[i] = c;
        i++;
-       if(i%10==0)
-       {
-           string = realloc(string,(i+10)*sizeof(char));
-       }
-       c = readChar();
+       c = readChar(); //va leyendo cada letra que le llega, la cual va guardando en un arreglo
    }
-
-   return string;
-
+   return i; //regresa el # de elementos (el numero de letras que tiene el nombre)
 }
-//Experimento 2
 
-//El envio es su nombre  (rave) 
+extern void Invert(char *Nombre, int longitud) //funcion para invertir el nombre 
+{
+    int i = 1;
+    int numero = 1; //empezamos con el # 1
+    int b = 0;
+    int bandera = 1;
+    int Size;
+    Size = longitud;
+    char invertido[longitud]; //arreglo para guardar el nombre con los numeros
+   
+    if (longitud < 10) //cuanta memoria necesitamos para guardar el nombre con los numeros 
+    
+        longitud = longitud + (longitud-1); //arreglos pequeños 
+    else
+    {
+        longitud = 18 + ((longitud - 9)*3); //arreglos grandes 
+    }     
 
-// invertirlo y regresarlo con numeros consecutivos
-// entre letras (e1v2a3r) 
+    while(i<longitud)
+    {
+        if (bandera == 1 )
+        {
+	        invertido[b] = Nombre[Size-i]; //se va guardando cada letra 
+	
+            i = i + 1; //para poder ir recorriendo el arreglo
+	        b = b + 1;
+    
+            bandera = 0; //se pone en 0 para que entre al else y agregue un numero 
+        }
+        else
+        {
+	        invertido[b] = numero + '0'; 
+	        numero = numero + 1;
+	        b = b + 1;
 
+            bandera = 1;
+        }
+    }
+
+    for(int j = 0; j <= (longitud - 1); j++)
+    {
+        Nombre[j]=invertido[j]; //se guarda el nombre invertido en el arreglo original
+    } 
+    
+    for(int k = longitud ;k <= 30; k++) //rellenar los espacios faltantes del arreglo
+        Nombre[k] = 0;
+    return;
+} 
